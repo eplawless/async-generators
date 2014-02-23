@@ -8,7 +8,6 @@ function iCombinator(x) { return x; }
 function traverse(ast, visitor, arrAncestors) {
     if (!ast) { return; }
     arrAncestors = arrAncestors || [];
-    level = arrAncestors.length;
     visitor = visitor || iCombinator;
 
     ast = visitor(ast, arrAncestors);
@@ -287,7 +286,7 @@ $__Promise__.prototype = {\
     isRejected: false,\
     executeTimeout: 0,\
     value: null,\
-    defer: setTimeout,\
+    defer: setImmediate || setTimeout,\
     adoptState: function(otherPromise) {\
         var arrFulfilledActions = this.arrFulfilledActions;\
         var arrRejectedActions = this.arrRejectedActions;\
@@ -320,7 +319,7 @@ $__Promise__.prototype = {\
         } catch (error) {\
             this.reject(error);\
         }\
-        this.executeTimeout = this.defer(this.executeActions, 0);\
+        this.executeTimeout = this.defer(this.executeActions);\
     },\
     then: function(onFulfilled, onRejected) {\
         onFulfilled = typeof onFulfilled === "function" ? onFulfilled : this.noop;\
@@ -328,7 +327,7 @@ $__Promise__.prototype = {\
         this.arrFulfilledActions.push(onFulfilled);\
         this.arrRejectedActions.push(onRejected);\
         if ((this.isFulfilled || this.isRejected) && this.executeTimeout === 0) {\
-            this.executeTimeout = this.defer(this.executeActions, 0);\
+            this.executeTimeout = this.defer(this.executeActions);\
         }\
         return this;\
     },\
@@ -360,7 +359,7 @@ $__Promise__.prototype = {\
         this.isRejected = false;\
         this.value = value;\
         if (!this.executeTimeout) {\
-            this.executeTimeout = this.defer(this.executeActions, 0);\
+            this.executeTimeout = this.defer(this.executeActions);\
         }\
     },\
     reject: function(value) {\
@@ -368,7 +367,7 @@ $__Promise__.prototype = {\
         this.isRejected = true;\
         this.value = value;\
         if (!this.executeTimeout) {\
-            this.executeTimeout = this.defer(this.executeActions, 0);\
+            this.executeTimeout = this.defer(this.executeActions);\
         }\
     }\
 };\
@@ -427,6 +426,7 @@ function $__setValue__(value){$__value__=value}\n'
             break;
         case 'AwaitExpression':
             var argumentCode = escodegen.generate(ast.argument);
+            // wrap this in a temporary generator function so the yield is legal
             ast.argument = parseCodeSnippet(
 'function *_() {(\n\
     $__value__ = ' + argumentCode + ',\n\
