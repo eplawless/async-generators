@@ -260,10 +260,10 @@ function isInAsyncGenerator(arrAncestors) {
 function rewriteAsyncYield(ast, arrAncestors) {
     if (!ast) { return; }
     if (ast.type === 'YieldExpression' && isInAsyncGenerator(arrAncestors)) {
-        var argumentCode = escodegen.generate(ast.argument);
         var call = parseCodeSnippet(
-'$__observer__ && $__observer__.next && $__observer__.next(' + argumentCode + ')'
+'$__observer__ && $__observer__.next && $__observer__.next()'
         )[0].expression;
+        call.right.arguments.push(ast.argument);
         return call;
     }
     return ast;
@@ -373,8 +373,10 @@ $__Promise__.prototype = {\
     }\
 };\
 \
-function $__runAsyncGenerator__(asyncGenerator, observer) {\
-    var iterator = asyncGenerator(observer),\
+function $__runAsyncGenerator__(asyncGenerator) {\
+    var generatorArgs = Array.prototype.slice.call(arguments, 1), \
+        observer = generatorArgs.length && generatorArgs[generatorArgs.length-1], \
+        iterator = asyncGenerator.apply(null, generatorArgs),\
         isFinished = false,\
         response;\
 \
@@ -452,11 +454,15 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
                     ast.id.name = '$__' + ast.id.name + 'Generator__';
                 }
                 var astCode = escodegen.generate(ast);
-                return parseCodeSnippet(
-'function ' + name + '(observer) { \
-    return $__runAsyncGenerator__(' + astCode + ', observer); \
+                // we're implicitly passing along the observer
+                var astWrapped = parseCodeSnippet(
+'function ' + name + '() { \
+    var generatorArgs = Array.prototype.slice.call(arguments, 0); \
+    generatorArgs.unshift(' + astCode + '); \
+    return $__runAsyncGenerator__.apply(null, generatorArgs); \
 }'
                 )[0];
+                return astWrapped;
             }
     }
     return ast;
