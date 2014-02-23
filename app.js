@@ -241,17 +241,6 @@ function traverse(ast, visitor, arrAncestors) {
     return ast;
 }
 
-program.parse(process.argv);
-
-function printType(ast, level) {
-    var strLevel = '';
-    for (var idx = 1; idx < level; ++idx) {
-        strLevel += ' ';
-    }
-    console.log(strLevel + ast.type);
-    return ast;
-}
-
 function parseCodeSnippet(codeSnippet) {
     var ast = esprima.parse(codeSnippet, { raw: true, tokens: true, range: true, comment: true });
     return ast.body || [];
@@ -475,18 +464,38 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
     return ast;
 }
 
-try {
-    var filename = program.args[0];
+function getRewrittenFileContents(filename) {
     var contents = fs.readFileSync(filename);
     var ast = esprima.parse(contents, { raw: true, tokens: true, range: true, comment: true });
 
+    // Rewrite yield first so that when we replace await with yield nothing breaks.
     traverse(ast, rewriteAsyncYield);
     traverse(ast, rewriteAsyncAwait);
     traverse(ast, rewriteAsyncGenerators);
 
-    var code = escodegen.generate(ast);
-    //console.log(code);
-    eval(code);
+    return escodegen.generate(ast);
+}
+
+try {
+
+    program.
+        command('exec <filename>').
+        description('Rewrite and execute the given JS file').
+        action(function(filename) {
+            var code = getRewrittenFileContents(filename);
+            eval(code);
+        });
+
+    program.
+        command('print <filename>').
+        description('Rewrite and print the contents of the given JS file').
+        action(function(filename) {
+            var code = getRewrittenFileContents(filename);
+            console.log(code);
+        });
+
+    program.parse(process.argv);
+
 } catch (e) {
     console.error(e.stack);
 }
