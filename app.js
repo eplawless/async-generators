@@ -273,7 +273,7 @@ function rewriteAsyncYield(ast, arrAncestors) {
     if (ast.type === 'YieldExpression' && isInAsyncGenerator(arrAncestors)) {
         var argumentCode = escodegen.generate(ast.argument);
         var call = parseCodeSnippet(
-'$__observer__ && $__observer__.next(' + argumentCode + ')'
+'$__observer__ && $__observer__.next && $__observer__.next(' + argumentCode + ')'
         )[0].expression;
         return call;
     }
@@ -394,7 +394,7 @@ function $__runAsyncGenerator__(asyncGenerator, observer) {\
         try {\
             response = error ? iterator.throw(error) : iterator.next(result);\
         } catch (error) {\
-            observer.throw(error);\
+            observer && observer.throw && observer.throw(error);\
             return;\
         }\
         isFinished = response.done;\
