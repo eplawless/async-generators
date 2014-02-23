@@ -412,10 +412,8 @@ function rewriteAsyncAwait(ast, arrAncestors) {
         case 'ArrowFunctionExpression':
         case 'FunctionExpression':
             if (ast.async) {
-                if (ast.generator) {
-                    ast.isAsyncGenerator = true;
-                    __addPromiseImplementation(arrAncestors[0]);
-                }
+                __addPromiseImplementation(arrAncestors[0]);
+                ast.isAsync = true;
                 ast.async = false;
                 ast.generator = true;
                 ast.params = ast.params.concat({ type: 'Identifier', name: '$__observer__' });
@@ -447,7 +445,7 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
         case 'FunctionDeclaration':
         case 'ArrowFunctionExpression':
         case 'FunctionExpression':
-            if (ast.isAsyncGenerator) {
+            if (ast.isAsync) {
                 var name;
                 if (ast.id) {
                     name = ast.id.name;
