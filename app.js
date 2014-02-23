@@ -18,7 +18,7 @@ function traverse(ast, visitor, arrAncestors) {
     switch (ast.type) {
         case 'BlockStatement':
         case 'Program':
-		case 'ClassBody':
+        case 'ClassBody':
             for (var idx = 0; idx < ast.body.length; ++idx) {
                 ast.body[idx] = traverse(ast.body[idx], visitor, arrAncestors);
             }
@@ -43,13 +43,13 @@ function traverse(ast, visitor, arrAncestors) {
             break;
         case 'LogicalExpression':
         case 'AssignmentExpression':
-		case 'BinaryExpression':
-		case 'ComprehensionBlock':
+        case 'BinaryExpression':
+        case 'ComprehensionBlock':
             ast.left = traverse(ast.left, visitor, arrAncestors);
             ast.right = traverse(ast.right, visitor, arrAncestors);
             break;
         case 'WhileStatement':
-		case 'DoWhileStatement':
+        case 'DoWhileStatement':
             ast.test = traverse(ast.test, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
@@ -63,7 +63,7 @@ function traverse(ast, visitor, arrAncestors) {
             ast.value = traverse(ast.value, visitor, arrAncestors);
             break;
         case 'FunctionDeclaration':
-		case 'ArrowFunctionExpression':
+        case 'ArrowFunctionExpression':
         case 'FunctionExpression':
             for (var idx = 0; idx < ast.params.length; ++idx) {
                 ast.params[idx] = traverse(ast.params[idx], visitor, arrAncestors);
@@ -73,26 +73,26 @@ function traverse(ast, visitor, arrAncestors) {
             }
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'LabeledStatement':
+        case 'LabeledStatement':
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'WithStatement':
+        case 'WithStatement':
             ast.object = traverse(ast.object, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'SwitchStatement':
+        case 'SwitchStatement':
             ast.discriminant = traverse(ast.discriminant, visitor, arrAncestors);
             for (var idx = 0; idx < ast.cases.length; ++idx) {
                 ast.cases[idx] = traverse(ast.cases[idx], visitor, arrAncestors);
             }
             break;
-		case 'SwitchCase':
+        case 'SwitchCase':
             ast.test = traverse(ast.test, visitor, arrAncestors);
             for (var idx = 0; idx < ast.consequent.length; ++idx) {
                 ast.consequent[idx] = traverse(ast.consequent[idx], visitor, arrAncestors);
             }
             break;
-		case 'TryStatement':
+        case 'TryStatement':
             ast.block = traverse(ast.block, visitor, arrAncestors);
             ast.handler = traverse(ast.handler, visitor, arrAncestors);
             for (var idx = 0; idx < ast.guardedHandlers.length; ++idx) {
@@ -100,14 +100,14 @@ function traverse(ast, visitor, arrAncestors) {
             }
             ast.finalizer = traverse(ast.finalizer, visitor, arrAncestors);
             break;
-		case 'ForStatement':
+        case 'ForStatement':
             ast.init = traverse(ast.init, visitor, arrAncestors);
             ast.test = traverse(ast.test, visitor, arrAncestors);
             ast.update = traverse(ast.update, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'ForInStatement':
-		case 'ForOfStatement':
+        case 'ForInStatement':
+        case 'ForOfStatement':
             ast.left = traverse(ast.left, visitor, arrAncestors);
             ast.right = traverse(ast.right, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
@@ -120,26 +120,26 @@ function traverse(ast, visitor, arrAncestors) {
             }
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'ArrayExpression':
+        case 'ArrayExpression':
             for (var idx = 0; idx < ast.elements.length; ++idx) {
                 ast.elements[idx] = traverse(ast.elements[idx], visitor, arrAncestors);
             }
             break;
-		case 'SequenceExpression':
+        case 'SequenceExpression':
             for (var idx = 0; idx < ast.expressions.length; ++idx) {
                 ast.expressions[idx] = traverse(ast.expressions[idx], visitor, arrAncestors);
             }
             break;
-		case 'YieldExpression':
-		case 'UpdateExpression':
-		case 'ThrowStatement':
+        case 'YieldExpression':
+        case 'UpdateExpression':
+        case 'ThrowStatement':
         case 'UnaryExpression':
         case 'ReturnStatement':
-		case 'AwaitExpression':
-		case 'SpreadElement':
+        case 'AwaitExpression':
+        case 'SpreadElement':
             ast.argument = traverse(ast.argument, visitor, arrAncestors);
             break;
-		case 'NewExpression':
+        case 'NewExpression':
         case 'CallExpression':
             ast.callee = traverse(ast.callee, visitor, arrAncestors);
             for (var idx = 0; idx < ast.arguments.length; ++idx) {
@@ -151,70 +151,70 @@ function traverse(ast, visitor, arrAncestors) {
             ast.property = traverse(ast.property, visitor, arrAncestors);
             break;
         case 'GeneratorExpression':
-		case 'ComprehensionExpression':
+        case 'ComprehensionExpression':
             ast.body = traverse(ast.body, visitor, arrAncestors);
             for (var idx = 0; idx < ast.blocks.length; ++idx) {
                 ast.blocks[idx] = traverse(ast.blocks[idx], visitor, arrAncestors);
             }
             ast.filter = traverse(ast.filter, visitor, arrAncestors);
             break;
-		case 'ObjectPattern':
+        case 'ObjectPattern':
             for (var idx = 0; idx < ast.properties.length; ++idx) {
                 ast.properties[idx].key = traverse(ast.properties[idx].key, visitor, arrAncestors);
                 ast.properties[idx].value = traverse(ast.properties[idx].value, visitor, arrAncestors);
             }
             break;
-		case 'ArrayPattern':
+        case 'ArrayPattern':
             for (var idx = 0; idx < ast.elements.length; ++idx) {
                 ast.elements[idx] = traverse(ast.elements[idx], visitor, arrAncestors);
             }
             break;
-		case 'CatchClause':
+        case 'CatchClause':
             ast.param = traverse(ast.param, visitor, arrAncestors);
             ast.guard = traverse(ast.guard, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'ClassDeclaration':
-		case 'ClassExpression':
+        case 'ClassDeclaration':
+        case 'ClassExpression':
             ast.superClass = traverse(ast.superClass, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'ExportDeclaration':
+        case 'ExportDeclaration':
             ast.declaration = traverse(ast.declaration, visitor, arrAncestors);
             for (var idx = 0; idx < ast.specifiers.length; ++idx) {
                 ast.specifiers[idx] = traverse(ast.specifiers[idx], visitor, arrAncestors);
             }
             ast.source = traverse(ast.source, visitor, arrAncestors);
             break;
-		case 'ExportSpecifier':
-		case 'ImportSpecifier':
+        case 'ExportSpecifier':
+        case 'ImportSpecifier':
             ast.id = traverse(ast.id, visitor, arrAncestors);
             break;
-		case 'ImportDeclaration':
+        case 'ImportDeclaration':
             for (var idx = 0; idx < ast.specifiers.length; ++idx) {
                 ast.specifiers[idx] = traverse(ast.specifiers[idx], visitor, arrAncestors);
             }
             ast.source = traverse(ast.source, visitor, arrAncestors);
             break;
-		case 'MethodDefinition':
+        case 'MethodDefinition':
             ast.key = traverse(ast.key, visitor, arrAncestors);
             ast.value = traverse(ast.value, visitor, arrAncestors);
             break;
-		case 'ModuleDeclaration':
+        case 'ModuleDeclaration':
             ast.id = traverse(ast.id, visitor, arrAncestors);
             ast.source = traverse(ast.source, visitor, arrAncestors);
             ast.body = traverse(ast.body, visitor, arrAncestors);
             break;
-		case 'TaggedTemplateExpression':
+        case 'TaggedTemplateExpression':
             ast.tag = traverse(ast.tag, visitor, arrAncestors);
             ast.quasi = traverse(ast.quasi, visitor, arrAncestors);
             break;
-		case 'TemplateElement':
+        case 'TemplateElement':
             ast.value.raw = traverse(ast.value.raw, visitor, arrAncestors);
             ast.value.cooked = traverse(ast.value.cooked, visitor, arrAncestors);
             ast.tail = traverse(ast.tail, visitor, arrAncestors);
             break;
-		case 'TemplateLiteral':
+        case 'TemplateLiteral':
             for (var idx = 0; idx < ast.quasis.length; ++idx) {
                 ast.quasis[idx] = traverse(ast.quasis[idx], visitor, arrAncestors);
             }
@@ -229,9 +229,9 @@ function traverse(ast, visitor, arrAncestors) {
         case 'BreakStatement':
         case 'Identifier':
         case 'Literal':
-		case 'ClassHeritage':
-		case 'EmptyStatement':
-		case 'ExportBatchSpecifier':
+        case 'ClassHeritage':
+        case 'EmptyStatement':
+        case 'ExportBatchSpecifier':
         default:
             break;
     }
@@ -409,7 +409,7 @@ function rewriteAsyncAwait(ast, arrAncestors) {
     if (!ast) { return; }
     switch (ast.type) {
         case 'FunctionDeclaration':
-		case 'ArrowFunctionExpression':
+        case 'ArrowFunctionExpression':
         case 'FunctionExpression':
             if (ast.async) {
                 if (ast.generator) {
@@ -445,7 +445,7 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
     if (!ast) { return; }
     switch (ast.type) {
         case 'FunctionDeclaration':
-		case 'ArrowFunctionExpression':
+        case 'ArrowFunctionExpression':
         case 'FunctionExpression':
             if (ast.isAsyncGenerator) {
                 var name;
