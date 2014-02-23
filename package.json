@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "dependencies": {
-      "esprima": "*",
+      "esprima": "git://github.com/jhusain/esprima.git#async-generators",
       "commander": "*",
       "escodegen": "*"
   },
