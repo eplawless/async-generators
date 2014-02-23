@@ -18,7 +18,7 @@ async function *test() {
         var result = await reader.read();
         if (result.done) return;
         if (result.value === 15) {
-            throw new Error(result.value);
+            throw new Error('What do you mean, ' + result.value + '!?');
         }
         yield result.value;
     }

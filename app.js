@@ -391,7 +391,12 @@ function $__runAsyncGenerator__(asyncGenerator, observer) {\
 \
     function next(error, result) {\
         if (isFinished) return;\
-        response = error ? iterator.throw(error) : iterator.next(result);\
+        try {\
+            response = error ? iterator.throw(error) : iterator.next(result);\
+        } catch (error) {\
+            observer.throw(error);\
+            return;\
+        }\
         isFinished = response.done;\
         if (response && !response.done) {\
             if (response.value && response.value.isPromise) {\
