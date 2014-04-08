@@ -19,4 +19,7 @@ function *printer() {
 
 var endpoint = printer();
 endpoint.next();
-source(endpoint);
+
+var observable = source();
+var disposable = observable.subscribe(endpoint);
+

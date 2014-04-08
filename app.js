@@ -1,7 +1,8 @@
 var esprima = require('esprima'),
     fs = require('fs'),
     program = require('commander'),
-    escodegen = require('escodegen');
+    escodegen = require('escodegen'),
+    g_id = 1;
 
 function iCombinator(x) { return x; }
 
@@ -258,12 +259,24 @@ function isInAsyncGenerator(arrAncestors) {
 
 function rewriteAsyncYield(ast, arrAncestors) {
     if (!ast) { return; }
-    if (ast.type === 'YieldExpression' && isInAsyncGenerator(arrAncestors)) {
-        var call = parseCodeSnippet(
-'$__observer__ && $__observer__.next && $__observer__.next()'
-        )[0].expression;
-        call.right.arguments.push(ast.argument);
-        return call;
+    if (ast.type === 'YieldExpression' &&
+        isInAsyncGenerator(arrAncestors) &&
+        !ast.ignore)
+    {
+        var result = parseCodeSnippet(
+'function *_() {(\n\
+    $__value__ = ($__observer__ && $__observer__.next && $__observer__.next({ done: false, value: null })),\n\
+    ($__value__ && $__value__.isPromise ?\n\
+        yield $__value__.then($__setValue__) :\n\
+        null),\n\
+    $__value__\n\
+)}'
+        )[0].body.body[0];
+        var call = result.expression.expressions[0].right.right;
+        call.arguments[0].properties[1].value = ast.argument;
+        var yieldToIgnore = result.expression.expressions[1].consequent;
+        yieldToIgnore.ignore = true;
+        return result.expression;
     }
     return ast;
 }
@@ -271,7 +284,7 @@ function rewriteAsyncYield(ast, arrAncestors) {
 function __addPromiseImplementation(astProgram) {
     if (astProgram.hasPromiseImplementation) { return; }
     var astPromiseImplementation = parseCodeSnippet(
-'function $__Promise__() {\
+'function Promise() {\
     this.arrFulfilledActions = [];\
     this.arrRejectedActions = [];\
     this.then = this.then.bind(this);\
@@ -280,7 +293,7 @@ function __addPromiseImplementation(astProgram) {
     this.executeActions = this.executeActions.bind(this);\
 }\
 \
-$__Promise__.prototype = {\
+Promise.prototype = {\
     isPromise: true,\
     isFulfilled: false,\
     isRejected: false,\
@@ -392,18 +405,42 @@ function $__runAsyncGenerator__(asyncGenerator) {\
             if (response.value && response.value.isPromise) {\
                 response.value.then(success, failure);\
             } else {\
-                next(undefined, response.value);\
+                next(undefined, response);\
             }\
+        } else {\
+            next(undefined, response);\
         }\
     }\
 \
     function success(result) { next(undefined, result); }\
     function failure(error) { next(error, undefined); }\
     next();\
+    return {\
+        dispose: function dispose() {\
+            isFinished = true;\
+        }\
+    }\
 }'
     );
     astProgram.body = astPromiseImplementation.concat(astProgram.body);
     astProgram.hasPromiseImplementation = true;
+}
+
+function __addObservableImplementation(astProgram) {
+    if (astProgram.hasObservableImplementation) { return; }
+    var astObservableImplementation = parseCodeSnippet(
+'function Observable(subscribe) {\
+    this.subscribe = subscribe;\
+}\
+\
+Observable.prototype = {\
+    "@@observe": function observe(iterator) {\
+        return this.subscribe(iterator);\
+    }\
+};'
+    );
+    astProgram.body = astObservableImplementation.concat(astProgram.body);
+    astProgram.hasObservableImplementation = true;
 }
 
 function rewriteAsyncAwait(ast, arrAncestors) {
@@ -414,6 +451,7 @@ function rewriteAsyncAwait(ast, arrAncestors) {
         case 'FunctionExpression':
             if (ast.async) {
                 __addPromiseImplementation(arrAncestors[0]);
+                __addObservableImplementation(arrAncestors[0]);
                 ast.isAsync = true;
                 ast.async = false;
                 ast.generator = true;
@@ -441,6 +479,65 @@ function $__setValue__(value){$__value__=value}\n'
     return ast;
 }
 
+function rewriteForAwait(ast, arrAncestors) {
+    if (!ast) { return; }
+    if (ast.type === 'ForAwaitStatement') {
+        var declarations = ast.left.declarations;
+        var loopVariable = declarations[declarations.length-1]
+        var result = parseCodeSnippet(
+'async function *_() {\
+    yield 0;\
+    var $__loopIterationPromise = new Promise;\
+    var $__resumeObservablePromise = new Promise;\
+    var disposable = REPLACEME["@@observe"]({\
+        next: function(tuple) {\
+            $__loopIterationPromise.fulfill(tuple);\
+            $__resumeObservablePromise = new Promise;\
+            return $__resumeObservablePromise;\
+        },\
+        error: function(error) {\
+            return $__loopIterationPromise.reject(error);\
+        }\
+    });\
+    try {\
+        while (true) {\
+            $__resumeObservablePromise.fulfill({ done: false });\
+            var $__tuple = await $__loopIterationPromise;\
+            $__tuple.value;\
+            if ($__tuple.done) {\
+                break;\
+            }\
+            $__loopIterationPromise = new Promise;\
+        }\
+    } catch (e) {\
+        disposable.dispose();\
+        throw e;\
+    }\
+}'
+        );
+
+        // remove yield
+        result[0].body.body.splice(0, 1);
+
+        // get loop init
+        var disposableInit = result[0].body.body[2].declarations[0];
+        disposableInit.init.callee.object = ast.right;
+
+        // insert declarations
+        var whileStatement = result[0].body.body[3].block.body[0];
+        var tupleValue = whileStatement.body.body.splice(2, 1, ast.left);
+        loopVariable.init = tupleValue[0].expression;
+
+        // insert loop body
+        whileStatement.body.body.splice(
+            whileStatement.body.body.length-1, 0, ast.body
+        )
+
+        return result[0].body;
+    }
+    return ast;
+}
+
 function rewriteAsyncGenerators(ast, arrAncestors) {
     if (!ast) { return; }
     switch (ast.type) {
@@ -453,13 +550,21 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
                     name = ast.id.name;
                     ast.id.name = '$__' + ast.id.name + 'Generator__';
                 }
+                ast.body.body.push(parseCodeSnippet(
+                    '($__observer__ && $__observer__.next && $__observer__.next({ done: true }));'
+                )[0]);
                 var astCode = escodegen.generate(ast);
                 // we're implicitly passing along the observer
                 var astWrapped = parseCodeSnippet(
 'function ' + name + '() { \
     var generatorArgs = Array.prototype.slice.call(arguments, 0); \
     generatorArgs.unshift(' + astCode + '); \
-    return $__runAsyncGenerator__.apply(null, generatorArgs); \
+    return new Observable(function subscribe(observer) {\
+        if (typeof observer === "function") {\
+            observer = { next: observer };\
+        }\
+        return $__runAsyncGenerator__.apply(null, generatorArgs.concat(observer));\
+    });\
 }'
                 )[0];
                 return astWrapped;
@@ -472,7 +577,10 @@ function getRewrittenFileContents(filename) {
     var contents = fs.readFileSync(filename);
     var ast = esprima.parse(contents, { raw: true, tokens: true, range: true, comment: true });
 
+    g_id = 1;
+
     // Rewrite yield first so that when we replace await with yield nothing breaks.
+    traverse(ast, rewriteForAwait);
     traverse(ast, rewriteAsyncYield);
     traverse(ast, rewriteAsyncAwait);
     traverse(ast, rewriteAsyncGenerators);
