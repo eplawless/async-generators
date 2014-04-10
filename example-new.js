@@ -23,6 +23,14 @@ async function *concat(xs, ys) {
     for (var y await ys) yield y;
 }
 
+async function *cartesianProduct(xs, ys) {
+    for (var x await xs) {
+        for (var y await ys) {
+            yield x + ' ' + y;
+        }
+    }
+}
+
 // Create a SafeObserver - prevents any further next calls, more than one error call
 // Call it onNext
 
@@ -37,11 +45,6 @@ function merge(xs, ys) {
             next: function next(value) {
                 return observer.next(value)
             },
-            throw: function throw(error) {
-                disposeXs.dispose();
-                disposeYs.dispose();
-                observer.throw(error);
-            }
         });
     })
 }

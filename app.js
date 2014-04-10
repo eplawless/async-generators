@@ -4,7 +4,16 @@ var esprima = require('esprima'),
     escodegen = require('escodegen'),
     g_id = 1;
 
+function getNextUniqueId() { return g_id++; }
+function resetUniqueId() { g_id = 1; }
 function iCombinator(x) { return x; }
+
+function privateVariableName(name) {
+    return '\u02c0' + name;
+}
+function uniqueVariableName(name) {
+    return privateVariableName(name) + '\u02c0' + getNextUniqueId();
+}
 
 function traverse(ast, visitor, arrAncestors) {
     if (!ast) { return; }
@@ -263,13 +272,17 @@ function rewriteAsyncYield(ast, arrAncestors) {
         isInAsyncGenerator(arrAncestors) &&
         !ast.ignore)
     {
+        var valueName = privateVariableName('value');
+        var observerName = privateVariableName('observer');
+        var setValueName = privateVariableName('setValue');
+
         var result = parseCodeSnippet(
 'function *_() {(\n\
-    $__value__ = ($__observer__ && $__observer__.next && $__observer__.next({ done: false, value: null })),\n\
-    ($__value__ && $__value__.isPromise ?\n\
-        yield $__value__.then($__setValue__) :\n\
+    '+valueName+' = ('+observerName+' && '+observerName+'.next && '+observerName+'.next({ done: false, value: null })),\n\
+    ('+valueName+' && '+valueName+'.isPromise ?\n\
+        yield '+valueName+'.then('+setValueName+') :\n\
         null),\n\
-    $__value__\n\
+    '+valueName+'\n\
 )}'
         )[0].body.body[0];
         var call = result.expression.expressions[0].right.right;
@@ -283,6 +296,7 @@ function rewriteAsyncYield(ast, arrAncestors) {
 
 function __addPromiseImplementation(astProgram) {
     if (astProgram.hasPromiseImplementation) { return; }
+    var runAsyncGeneratorName = privateVariableName('runAsyncGenerator');
     var astPromiseImplementation = parseCodeSnippet(
 'function Promise() {\
     this.arrFulfilledActions = [];\
@@ -385,9 +399,9 @@ Promise.prototype = {\
     }\
 };\
 \
-function $__runAsyncGenerator__(asyncGenerator) {\
+function '+runAsyncGeneratorName+'(asyncGenerator) {\
     var generatorArgs = Array.prototype.slice.call(arguments, 1), \
-        observer = generatorArgs.length && generatorArgs[generatorArgs.length-1], \
+        observer = generatorArgs[1],\
         iterator = asyncGenerator.apply(null, generatorArgs),\
         isFinished = false,\
         response;\
@@ -445,6 +459,9 @@ Observable.prototype = {\
 
 function rewriteAsyncAwait(ast, arrAncestors) {
     if (!ast) { return; }
+    var observerName = privateVariableName('observer');
+    var valueName = privateVariableName('value');
+    var setValueName = privateVariableName('setValue');
     switch (ast.type) {
         case 'FunctionDeclaration':
         case 'ArrowFunctionExpression':
@@ -455,10 +472,13 @@ function rewriteAsyncAwait(ast, arrAncestors) {
                 ast.isAsync = true;
                 ast.async = false;
                 ast.generator = true;
-                ast.params = ast.params.concat({ type: 'Identifier', name: '$__observer__' });
+                ast.params.unshift({
+                    type: 'Identifier',
+                    name: observerName
+                });
                 ast.body.body = parseCodeSnippet(
-'var $__value__;\n\
-function $__setValue__(value){$__value__=value}\n'
+'var '+valueName+';\n\
+function '+setValueName+'(value){'+valueName+'=value}\n'
                 ).concat(ast.body.body)
             }
             break;
@@ -467,11 +487,11 @@ function $__setValue__(value){$__value__=value}\n'
             // wrap this in a temporary generator function so the yield is legal
             ast.argument = parseCodeSnippet(
 'function *_() {(\n\
-    $__value__ = ' + argumentCode + ',\n\
-    ($__value__ && $__value__.isPromise ?\n\
-        yield $__value__.then($__setValue__) :\n\
+    '+valueName+' = '+argumentCode+',\n\
+    ('+valueName+' && '+valueName+'.isPromise ?\n\
+        yield '+valueName+'.then('+setValueName+') :\n\
         null),\n\
-    $__value__\n\
+    '+valueName+'\n\
 )}'
             )[0].body.body[0].expression;
             return ast.argument;
@@ -484,39 +504,47 @@ function rewriteForAwait(ast, arrAncestors) {
     if (ast.type === 'ForAwaitStatement') {
         var declarations = ast.left.declarations;
         var loopVariable = declarations[declarations.length-1]
+
+        var loopIterationPromiseName = uniqueVariableName('loopIterationPromise');
+        var resumeObservablePromiseName = uniqueVariableName('resumeObservablePromise');
+        var disposableName = uniqueVariableName('disposable');
+        var tupleName = uniqueVariableName('tuple');
+
+        // Adding a yield 0 statement makes esprima not freak out about generators without yields.
+        // Naming it _ makes esprima not freak out about unnamed generators.
         var result = parseCodeSnippet(
 'async function *_() {\
     yield 0;\
-    var $__loopIterationPromise = new Promise;\
-    var $__resumeObservablePromise = new Promise;\
-    var disposable = REPLACEME["@@observe"]({\
+    var '+loopIterationPromiseName+' = new Promise;\
+    var '+resumeObservablePromiseName+' = new Promise;\
+    var '+disposableName+' = REPLACEME["@@observe"]({\
         next: function(tuple) {\
-            $__loopIterationPromise.fulfill(tuple);\
-            $__resumeObservablePromise = new Promise;\
-            return $__resumeObservablePromise;\
+            '+loopIterationPromiseName+'.fulfill(tuple);\
+            '+resumeObservablePromiseName+' = new Promise;\
+            return '+resumeObservablePromiseName+';\
         },\
         error: function(error) {\
-            return $__loopIterationPromise.reject(error);\
+            return '+loopIterationPromiseName+'.reject(error);\
         }\
     });\
     try {\
         while (true) {\
-            $__resumeObservablePromise.fulfill({ done: false });\
-            var $__tuple = await $__loopIterationPromise;\
-            $__tuple.value;\
-            if ($__tuple.done) {\
+            '+resumeObservablePromiseName+'.fulfill({ done: false });\
+            var '+tupleName+' = await '+loopIterationPromiseName+';\
+            '+tupleName+'.value;\
+            if ('+tupleName+'.done) {\
                 break;\
             }\
-            $__loopIterationPromise = new Promise;\
+            '+loopIterationPromiseName+' = new Promise;\
         }\
     } catch (e) {\
-        disposable.dispose();\
+        '+disposableName+'.dispose();\
         throw e;\
     }\
 }'
         );
 
-        // remove yield
+        // remove yield 0
         result[0].body.body.splice(0, 1);
 
         // get loop init
@@ -548,22 +576,28 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
                 var name;
                 if (ast.id) {
                     name = ast.id.name;
-                    ast.id.name = '$__' + ast.id.name + 'Generator__';
+                    ast.id.name = uniqueVariableName(ast.id.name + 'Generator');
                 }
+
+                var runAsyncGeneratorName = privateVariableName('runAsyncGenerator');
+                var observerName = privateVariableName('observer');
+
                 ast.body.body.push(parseCodeSnippet(
-                    '($__observer__ && $__observer__.next && $__observer__.next({ done: true }));'
+                    '('+observerName+' && '+observerName+'.next && '+observerName+'.next({ done: true }));'
                 )[0]);
                 var astCode = escodegen.generate(ast);
                 // we're implicitly passing along the observer
                 var astWrapped = parseCodeSnippet(
 'function ' + name + '() { \
     var generatorArgs = Array.prototype.slice.call(arguments, 0); \
+    generatorArgs.unshift(null); /* placeholder for observers */ \
     generatorArgs.unshift(' + astCode + '); \
     return new Observable(function subscribe(observer) {\
         if (typeof observer === "function") {\
             observer = { next: observer };\
         }\
-        return $__runAsyncGenerator__.apply(null, generatorArgs.concat(observer));\
+        generatorArgs[1] = observer;\
+        return '+runAsyncGeneratorName+'.apply(null, generatorArgs);\
     });\
 }'
                 )[0];
@@ -573,11 +607,17 @@ function rewriteAsyncGenerators(ast, arrAncestors) {
     return ast;
 }
 
-function getRewrittenFileContents(filename) {
+function prettyPrint(ast, arrAncestors) {
+    var indent = arrAncestors.map(function() { return ' '; }).join('');
+    console.log(indent + ast.type);
+    return ast;
+}
+
+function getRewrittenAst(filename) {
     var contents = fs.readFileSync(filename);
     var ast = esprima.parse(contents, { raw: true, tokens: true, range: true, comment: true });
 
-    g_id = 1;
+    resetUniqueId();
 
     // Rewrite yield first so that when we replace await with yield nothing breaks.
     traverse(ast, rewriteForAwait);
@@ -585,7 +625,11 @@ function getRewrittenFileContents(filename) {
     traverse(ast, rewriteAsyncAwait);
     traverse(ast, rewriteAsyncGenerators);
 
-    return escodegen.generate(ast);
+    return ast;
+}
+
+function getRewrittenFileContents(filename) {
+    return escodegen.generate(getRewrittenAst(filename));
 }
 
 try {
@@ -606,7 +650,17 @@ try {
             console.log(code);
         });
 
+    program.
+        command('print-ast <filename>').
+        description('Rewrite and print the abstract syntax tree of the given JS file').
+        action(function(filename) {
+            var ast = getRewrittenAst(filename);
+            traverse(ast, prettyPrint);
+        });
+
     program.parse(process.argv);
+
+    if (!program.args.length) program.help();
 
 } catch (e) {
     console.error(e.stack);
