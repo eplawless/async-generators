@@ -499,9 +499,9 @@ function '+setValueName+'(value){'+valueName+'=value}\n'
     return ast;
 }
 
-function rewriteForAwait(ast, arrAncestors) {
+function rewriteForOn(ast, arrAncestors) {
     if (!ast) { return; }
-    if (ast.type === 'ForAwaitStatement') {
+    if (ast.type === 'ForOnStatement') {
         var declarations = ast.left.declarations;
         var loopVariable = declarations[declarations.length-1]
 
@@ -620,7 +620,7 @@ function getRewrittenAst(filename) {
     resetUniqueId();
 
     // Rewrite yield first so that when we replace await with yield nothing breaks.
-    traverse(ast, rewriteForAwait);
+    traverse(ast, rewriteForOn);
     traverse(ast, rewriteAsyncYield);
     traverse(ast, rewriteAsyncAwait);
     traverse(ast, rewriteAsyncGenerators);
